@@ -24,11 +24,11 @@ library(ggsci) #provides color palettes for ggplot2 that can be used for scienti
 library(matrixStats) #contains highly optimized functions to perform statistics on matrix data
 library(cowplot) #efficient functions to arrange several plots
 
-####################################Data clea-up steps###########################################
+####################################Data clean-up steps###########################################
 
 #upload feature table and metadata
-ft <- read.csv('~/Dropbox/2023 - NAU - Cope:AD/Pos_mode_raw/mzmine_pos_test1_iimn_gnps_quant.csv', header = T, check.names = F, sep = ",")
-md <- read.csv('~/Dropbox/2023 - NAU - Cope:AD/Pos_mode_raw/Cope_NAU FecalMetadata_posmode.csv', header = T, check.names = F, sep = ",")
+ft <- read.csv('~/Dropbox/2023 - Stromatolites DOM/PLOS One paper/MZmine 2 outputs/Stromatolite_Tissue_pos_022420_w_IIN_quant_remove>10mins.csv', header = T, check.names = F, sep = ",")
+md <- read.csv('~/Dropbox/2023 - Stromatolites DOM/PLOS One paper/MZmine 2 outputs/StromatoliteTissue_Pos_metadata_022420_submergedcolumn_2.csv', header = T, check.names = F, sep = ",")
 
 #Function: InsideLevels - checking data
 InsideLevels <- function(metatable){
@@ -80,9 +80,9 @@ new_ft <- new_ft[,grep('mzML',colnames(new_ft))]
 InsideLevels(new_md)
 new_ft<- new_ft[,order(colnames(new_ft))] #ordering the ft by its column names
 new_md <-new_md[order(rownames(new_md)),] #ordering the md by its row names
-write.csv(new_md, "~/Desktop/NAU_pos_new_md.csv",row.names = TRUE)
+write.csv(new_md, "~/Desktop/stromatolites_md.csv",row.names = TRUE)
 
-new_md <- read_csv('~/Desktop/NAU_pos_new_md.csv') %>% column_to_rownames("filename")
+new_md <- read_csv('~/Desktop/stromatolites_md.csv') %>% column_to_rownames("filename")
 #new_md <- new_md[, -1]
 
 #lists the colnames(ft) which are not present in md
@@ -161,7 +161,7 @@ if(casefold(readline('Do you want to perform Blank Removal- Y/N:'),upper=T)=='Y'
 #check output - blank removed
 dim(Blank_removal)
 
-write.csv(Blank_removal,file.path(paste0('Blank_removed_0.3_20230704.csv')),row.names =TRUE)
+write.csv(Blank_removal,file.path(paste0('Blank_removed_0.3_20231218.csv')),row.names =TRUE)
 
 #########################################Step 2 - LOD Imputation#########################
 #creating bins from -1 to 10^10 using sequence function seq()
@@ -187,25 +187,10 @@ ggplot(FreqTable, aes(Range_Bins, Log_Freq))+
   theme(axis.text.y = element_text(angle = 45, vjust = 0.5, hjust=1)) +   # setting the angle for the y label
   theme(plot.title = element_text(hjust = 0.5))
 
-Cutoff_LOD <- round(min(Blank_removal[Blank_removal!=min(Blank_removal)]))
+Cutoff_LOD <- 100
 print(paste0("The minimum value greater than 0 in gap-filled table: ",Cutoff_LOD))
 
 ##############################################################
-#random number imputation
-set.seed(141222)
-ran_values <-round(runif(length(Blank_removal),0,Cutoff_LOD),digits=1)
-ran_values
-
-blk_rem <- data.frame(Blank_removal)
-
-#imp <- blk_rem  %>% mutate(across(everything(), ~replace(., . == 0 , sample(ran_values, size=1))))
-
-if(casefold(readline('Do you want to perform Imputation? - Y/N:'),upper=T) == 'Y'){
-  Imputed <- blk_rem  %>%
-    mutate(blk_rem, ~replace(., . == 0 , sample(ran_values, size=1)))
-  head(Imputed)
-}
-################################################################
 #minimum LOD imputation
 if(casefold(readline('Do you want to perform Imputation? - Y/N:'),upper=T) == 'Y'){
   Imputed <- Blank_removal
@@ -215,24 +200,23 @@ if(casefold(readline('Do you want to perform Imputation? - Y/N:'),upper=T) == 'Y
 
 dim(Imputed)
 
-write.csv(Imputed,file.path(paste0('Imputed_QuantTable_filled_with_',Cutoff_LOD,'_CutOff_Used_',Cutoff,'_20230704.csv')),row.names =TRUE)
-
-###############################Step 3 - Normalization - do if step 4 is not performed########################
-#library(KODAMA) # to use the normalization function
-
-Normalized_data_TIC <- t(normalization(t(Imputed), method = "sum")$newXtrain) 
-head(Normalized_data_TIC,n=3)
-dim(Normalized_data_TIC)
-print(paste('No.of NA values in Normalized data:',sum(is.na(Normalized_data_TIC)== T)))
-write.csv(Normalized_data_TIC, file.path('Normalised_Quant_table.csv'),row.names =TRUE)
+write.csv(Imputed,file.path(paste0('Imputed_QuantTable_filled_with_',100,'_CutOff_Used_',Cutoff,'_20240103.csv')),row.names =TRUE)
 
 #################################Step 4 - scaling with clr transform function - do if step 3 is not performed##############
 Imp_t <- as.data.frame(t(Imputed)) #transposing the imputed table
 # center and scale data with scale() function
 library(vegan)
-Imp_clrt <- Imp_t %>% decostand(method = "rclr")
-write.csv(Imp_clrt, "~/Desktop/IMP_clr.csv",row.names = TRUE)
+Imp_clrt <- Imp_t %>% decostand(method = "rclr") %>% rownames_to_column("sample_name")
+write.csv(Imp_clrt, "Imp_clr_stromatolites.csv",row.names = TRUE)
+
+###############################Step 3 - Normalization - do if step 4 is not performed########################
+#library(KODAMA) # to use the normalization function
+Normalized_data_TIC <- t(normalization(t(Imputed), method = "sum")$newXtrain) 
+head(Normalized_data_TIC,n=3)
+dim(Normalized_data_TIC)
+print(paste('No.of NA values in Normalized data:',sum(is.na(Normalized_data_TIC)== T)))
+write.csv(Normalized_data_TIC, file.path('Normalised_TIC_20231218.csv'),row.names =TRUE)
 
 
-############################UNIVARIATE#################
+
 
